@@ -9,3 +9,12 @@ build/
 dist/
 *.spec
 .openai/
+.codex/
+.ssh/
+.npmrc
+settings.dat
+auth.json
+credentials.json
+hosts.yml
+*.log
+*.key
