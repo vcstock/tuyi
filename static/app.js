@@ -7,18 +7,53 @@ let sourceUrl;
 let resultUrl;
 let pending;
 let webJob;
+let activeProvider;
+const sessionKeys = new Map();
+const storageName = (provider) => "tuyi:key:v1:" + provider;
 
 function setOptions(id, values) {
   field(id).replaceChildren(...values.map((name) => new Option(name, name)));
 }
 
+function saveKeyPreference(announce = true) {
+  if (!activeProvider || !Object.hasOwn(options.providers, activeProvider)) return;
+  const value = field("key").value.trim();
+  const remember = field("remember-key").checked;
+  sessionKeys.set(activeProvider, {value, remember});
+  try {
+    if (remember && value) localStorage.setItem(storageName(activeProvider), value);
+    else localStorage.removeItem(storageName(activeProvider));
+    if (announce) {
+      field("key-status").textContent = remember && value ? "已保存到当前浏览器，仅用于此翻译服务。"
+        : remember ? "输入 API Key 后将保存在当前浏览器。" : "仅在当前页面使用，刷新后清除。";
+    }
+  } catch {
+    field("key-status").textContent = "无法更新浏览器本地存储。请检查网站数据权限。";
+  }
+}
+
 function serviceChanged() {
   const provider = field("provider").value;
+  activeProvider = provider;
   const model = options.providers[provider];
   field("key-field").hidden = !model;
   field("model-field").hidden = !model;
+  field("key-preferences").hidden = !model;
   field("web-help").hidden = Boolean(model);
-  field("key").value = "";
+  let entry = sessionKeys.get(provider);
+  let inaccessible = false;
+  if (!entry && model) {
+    try {
+      const value = localStorage.getItem(storageName(provider)) || "";
+      entry = {value, remember: Boolean(value)};
+    } catch {
+      inaccessible = true;
+    }
+  }
+  field("key").value = entry?.value || "";
+  field("remember-key").checked = entry?.remember ?? false;
+  field("key-status").textContent = inaccessible ? "无法读取浏览器本地存储。"
+    : entry?.remember ? "已启用本地保存。" : "仅在当前页面使用，刷新后清除。";
   field("model").value = "";
   field("model").placeholder = model?.model || "火山方舟模型 ID / 接入点";
 }
@@ -139,6 +174,33 @@ async function submit(data) {
 }
 
 field("provider").addEventListener("change", serviceChanged);
+field("key").addEventListener("input", () => saveKeyPreference());
+field("remember-key").addEventListener("change", () => saveKeyPreference());
+field("clear-key").addEventListener("click", () => {
+  field("key").value = "";
+  field("remember-key").checked = false;
+  saveKeyPreference(false);
+  try {
+    if (!localStorage.getItem(storageName(activeProvider))) {
+      field("key-status").textContent = "此翻译服务的本地 Key 已清除。";
+    }
+  } catch {
+    field("key-status").textContent = "无法清除本地存储。可在浏览器中清除本站数据。";
+  }
+});
+window.addEventListener("storage", (event) => {
+  if (!options || event.storageArea !== localStorage) return;
+  for (const provider of Object.keys(options.providers)) {
+    if (event.key !== null && event.key !== storageName(provider)) continue;
+    if (sessionKeys.get(provider)?.remember) sessionKeys.delete(provider);
+    if (provider === activeProvider && field("remember-key").checked) {
+      const value = event.newValue || "";
+      field("key").value = value;
+      field("remember-key").checked = Boolean(value);
+      field("key-status").textContent = value ? "本地 Key 已同步。" : "此翻译服务的本地 Key 已清除。";
+    }
+  }
+});
 field("pick-file").addEventListener("click", () => field("file").click());
 field("file").addEventListener("change", (event) => {
   importImage(event.target.files[0]);

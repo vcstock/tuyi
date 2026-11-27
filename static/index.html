@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="图译识别图片中的文字，翻译后按原版面回填。">
   <title>图译 · AI 图片翻译</title>
-  <link rel="stylesheet" href="/assets/style.css">
-  <script src="/assets/app.js" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=key-local-1">
+  <script src="/assets/app.js?v=key-local-1" defer></script>
 </head>
 <body>
   <header>
@@ -21,6 +21,11 @@
         <label id="key-field">API Key<input id="key" type="password" autocomplete="off" placeholder="也可使用服务器配置"></label>
         <label id="model-field">模型 / 接入点<input id="model" maxlength="200"></label>
         <p id="web-help" hidden>在服务官网登录，复制 AI 回复后回到图译生成图片。</p>
+        <div class="key-preferences" id="key-preferences" hidden>
+          <label class="remember"><input id="remember-key" type="checkbox">记住此设备</label>
+          <button id="clear-key" type="button">清除已保存的 Key</button>
+          <p id="key-status" role="status">设置按服务保存在当前浏览器。</p>
+        </div>
       </div>
     </details>
     <form id="workbench">

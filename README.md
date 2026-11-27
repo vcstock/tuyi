@@ -4,14 +4,14 @@
 
 | 版本 | 运行方式 | OCR |
 | --- | --- | --- |
-| Windows | 在 [GitHub Releases](../../releases) 下载 `TuYi-Windows-x64.exe`，双击运行 | 优先使用 DirectML GPU，失败时回退 CPU |
+| Windows | 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/download/v0.1.0/TuYi-Windows-x64.exe)，双击运行 | 优先使用 DirectML GPU，失败时回退 CPU |
 | 网页版 | 在 Docker 主机执行 `docker compose up -d --build`，用浏览器打开 | 在服务器上使用 CPU |
 
 两版均支持选择图片或粘贴图片、术语与指定译法、目标语言选择，以及缩放导出。译图保留图像布局，并根据 OCR 结果估算对齐和字号。同字号组共用字号。复杂背景、装饰字体和低清晰度图片可能影响识别与回填效果。
 
 ## Windows 便携版
 
-1. 从 [Releases](../../releases) 下载 Windows 64 位 EXE，复制到任意有权限的文件夹后运行。
+1. 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/download/v0.1.0/TuYi-Windows-x64.exe)，复制到任意有权限的文件夹后运行。
 2. 打开「设置」，选择翻译服务，输入账号或 API Key；如有需要可配置 HTTP、HTTPS、SOCKS5 或 SOCKS5H 代理。
 3. 使用 Ctrl+V 或「选择图片」导入。需要指定译法时，填写「术语与翻译要求」后点击「开始翻译」。
 4. 选择格式和缩放后保存。JPG 默认画质为 92%，译图下方显示当前配置下的输出尺寸和文件大小。
@@ -46,13 +46,13 @@ docker compose down
 | Kimi | `MOONSHOT_API_KEY` |
 | Gemini | `GEMINI_API_KEY` |
 
-可以在展开的服务设置里临时填写自己的 API Key。服务端环境变量也可作为默认 Key。能访问网页的用户可使用服务器配置的额度，所以应先配置访问控制。使用代理时，在 `.env` 中设置 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 后重建容器。
+在「翻译服务设置」里填写 API Key，勾选「记住此设备」可按服务保存在当前浏览器，刷新和切换服务后仍可使用。「清除已保存的 Key」清除当前服务保存的值。服务端环境变量也可作为站点管理员单独设置的默认 Key。能访问网页的用户可使用服务器配置的额度，所以应先配置访问控制。使用代理时，在 `.env` 中设置 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 后重建容器。
 
 网页版也能切换到豆包、Kimi、DeepSeek 或 Gemini 的「网页登录」模式，并提供生成提示词与回填译文的界面。网页版的 OpenAI 自动翻译使用 API Key。ChatGPT 账号直连模式由 Windows 版提供。
 
 ### 图片处理与隐私
 
-- 网页版将图片交给部署服务器做 OCR，自动翻译时把识别出的文本和术语说明交给所选供应商。自填 API Key 随请求传给部署服务器，界面不会保存 Key。请仅使用自己或信任的实例。
+- 网页版将图片交给部署服务器做 OCR，自动翻译时把识别出的文本和术语说明交给所选供应商。自填 Key 随翻译请求交给后端转发，应用不会在服务器上持久保存它。「记住此设备」使用浏览器本地存储，Key 没有额外加密。联网使用时请访问受信任的 HTTPS 实例，共用设备上请选择临时使用。
 - 支持 PNG、JPG、WebP、AVIF、TIFF、BMP、GIF、SVG、SVGZ 等格式。SVG 和 SVGZ 导出内嵌位图。部分浏览器无法预览 TIFF 或 SVGZ，仍可下载。动图和多页图片按首帧处理。
 - 上传请求限制为 20 MB，图片和缩放后的输出限制为 3000 万像素。
 

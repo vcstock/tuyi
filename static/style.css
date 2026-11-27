@@ -25,6 +25,8 @@ summary { cursor: pointer; padding: .55rem 0; font-weight: 650; }
 .settings { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; padding: .25rem 0 .85rem; }
 .settings p { margin: 0; color: var(--muted); }
 .settings label, .instructions, dialog label { display: grid; gap: .35rem; }
+.key-preferences { flex-basis: 100%; display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
+.settings .remember { display: inline-flex; align-items: center; gap: .35rem; }
 .toolbar, .exports, .dialog-controls { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .toolbar { margin-bottom: .75rem; }
 .spacer { flex: 1; }
