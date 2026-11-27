@@ -1,0 +1,10 @@
+name: tuyi
+services:
+  tuyi:
+    build: .
+    ports:
+      - "${TUYI_BIND:-127.0.0.1}:${TUYI_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

@@ -1,0 +1,49 @@
+name: Docker smoke test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the service
+        run: docker compose up --build -d --wait
+      - name: Verify HTTP and container OCR
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/healthz
+          docker compose exec -T tuyi python - <<'PY'
+          from io import BytesIO
+          from PIL import Image, ImageDraw, ImageFont
+          from translation import font_file
+          from web import app
+
+          image = Image.new("RGB", (480, 180), "white")
+          ImageDraw.Draw(image).text((40, 60), "Hello World", fill="black",
+                                     font=ImageFont.truetype(font_file("en"), 38))
+          encoded = BytesIO()
+          image.save(encoded, "PNG")
+          with app.test_client() as client:
+              data = {"action": "prepare", "provider": "Kimi 网页登录",
+                      "image": (BytesIO(encoded.getvalue()), "source.png")}
+              prepared = client.post("/api/image", data=data)
+              assert prepared.status_code == 200, prepared.get_json()
+              assert prepared.json["lines"] == 1, prepared.json
+              data.update(action="render", reply="你好，世界", format="JPG", scale="60",
+                          image=(BytesIO(encoded.getvalue()), "source.png"))
+              rendered = client.post("/api/image", data=data)
+              assert rendered.status_code == 200, rendered.get_json()
+              assert rendered.headers["X-Image-Dimensions"] == "288x108"
+              assert Image.open(BytesIO(rendered.data)).size == (288, 108)
+          PY
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop containers
+        if: always()
+        run: docker compose down

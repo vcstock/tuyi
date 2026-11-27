@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="图译识别图片中的文字，翻译后按原版面回填。">
+  <title>图译 · AI 图片翻译</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>图译</strong><span>AI 图片翻译</span></div>
+    <span class="shortcut">Ctrl / ⌘ + V 粘贴图片</span>
+  </header>
+  <main>
+    <details>
+      <summary>翻译服务设置</summary>
+      <div class="settings">
+        <label>翻译服务<select id="provider"></select></label>
+        <label id="key-field">API Key<input id="key" type="password" autocomplete="off" placeholder="也可使用服务器配置"></label>
+        <label id="model-field">模型 / 接入点<input id="model" maxlength="200"></label>
+        <p id="web-help" hidden>在服务官网登录，复制 AI 回复后回到图译生成图片。</p>
+      </div>
+    </details>
+    <form id="workbench">
+      <div class="toolbar">
+        <label class="button" for="file">选择图片</label>
+        <input id="file" type="file" accept="image/*,.svg,.svgz,.tif,.tiff,.avif,.qoi,.dds,.tga" hidden>
+        <label class="field">译为<select id="language"></select></label>
+        <button class="primary" id="translate" disabled>开始翻译</button>
+        <span class="spacer"></span>
+        <button type="button" id="toggle">收起原图</button>
+        <a class="button" id="download" hidden download>保存译图</a>
+      </div>
+      <div id="previews" class="previews">
+        <figure id="original">
+          <figcaption>原图 <span id="source-name"></span></figcaption>
+          <div class="preview" id="drop">
+            <img id="source-preview" alt="原图预览" hidden>
+            <p id="source-empty">拖入、粘贴或选择图片</p>
+          </div>
+        </figure>
+        <figure>
+          <figcaption>译图 <span id="output-info"></span></figcaption>
+          <div class="preview">
+            <img id="result-preview" alt="译图预览" hidden>
+            <p id="result-empty">翻译完成后在这里预览</p>
+          </div>
+        </figure>
+      </div>
+      <div class="exports">
+        <label class="field">格式<select id="format"></select></label>
+        <label class="field">图片缩放 <input id="scale" type="number" min="1" max="400" value="100" list="scales">%</label>
+        <datalist id="scales"><option value="100"><option value="80"><option value="60"><option value="50"><option value="30"></datalist>
+        <label class="field">译文字号 <input id="text-scale" type="number" min="25" max="200" value="100">%</label>
+        <label class="field" id="quality-field" hidden>JPG 画质 <input id="quality" type="number" min="70" max="100" value="92">%</label>
+      </div>
+      <label class="instructions">术语与翻译要求<textarea id="instructions" rows="2" maxlength="4000" placeholder="例如 ROI → 投资回报率；品牌名保留原文"></textarea></label>
+      <p class="status" id="status" role="status">可上传 PNG、JPG、WebP、SVGZ 等图片。</p>
+    </form>
+    <dialog id="reply-dialog">
+      <h2>网页译文</h2>
+      <p id="reply-note"></p>
+      <div class="dialog-controls">
+        <button id="copy-prompt" type="button">复制提示词</button>
+        <a class="button" id="open-provider" rel="noopener noreferrer" target="_blank">打开官网</a>
+      </div>
+      <textarea id="prompt" rows="3" aria-label="翻译提示词" readonly></textarea>
+      <label>AI 回复<textarea id="reply" rows="5" placeholder="粘贴完整回复，或每行填写一条译文。"></textarea></label>
+      <p id="reply-error" role="status"></p>
+      <div class="dialog-controls">
+        <button id="cancel-reply" type="button">取消</button>
+        <button id="render" type="button" class="primary">生成译图</button>
+      </div>
+    </dialog>
+  </main>
+  <footer><a href="https://hy.chnmc.com/" rel="noopener noreferrer" target="_blank">研究报告 · 企业管理报告 · 论文资料</a></footer>
+</body>
+</html>

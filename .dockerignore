@@ -1,0 +1,8 @@
+**
+!Dockerfile
+!requirements-web.txt
+!web.py
+!translation.py
+!image_formats.py
+!static/
+!static/**
