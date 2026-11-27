@@ -139,6 +139,7 @@ async function submit(data) {
 }
 
 field("provider").addEventListener("change", serviceChanged);
+field("pick-file").addEventListener("click", () => field("file").click());
 field("file").addEventListener("change", (event) => {
   importImage(event.target.files[0]);
   event.target.value = "";

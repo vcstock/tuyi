@@ -16,7 +16,7 @@ from translation import (
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="/assets")
-app.config.update(MAX_CONTENT_LENGTH=20 * 1024 * 1024, MAX_FORM_MEMORY_SIZE=256 * 1024)
+app.config.update(MAX_CONTENT_LENGTH=20 * 1024 * 1024, MAX_FORM_MEMORY_SIZE=256 * 1024, MAX_FORM_PARTS=24)
 ocr_lock = Lock()
 KEY_ENV = {
     "DeepSeek API": "DEEPSEEK_API_KEY", "OpenAI API": "OPENAI_API_KEY",
@@ -87,6 +87,8 @@ def read_upload():
 
 @app.post("/api/image")
 def process_image():
+    if request.headers.get("Sec-Fetch-Site") in {"cross-site", "same-site"}:
+        return jsonify(error="请从本站页面上传图片。"), 403
     provider = request.form.get("provider", "")
     language = request.form.get("language", "简体中文")
     action = request.form.get("action", "translate")
