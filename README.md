@@ -4,19 +4,21 @@
 
 | 版本 | 运行方式 | OCR |
 | --- | --- | --- |
-| Windows | 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/download/v0.1.0/TuYi-Windows-x64.exe)，双击运行 | 优先使用 DirectML GPU，失败时回退 CPU |
+| Windows | 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/latest/download/TuYi-Windows-x64.exe)，双击运行 | 优先使用 DirectML GPU，失败时回退 CPU |
 | 网页版 | 在 Docker 主机执行 `docker compose up -d --build`，用浏览器打开 | 在服务器上使用 CPU |
 
 两版均支持选择图片或粘贴图片、术语与指定译法、目标语言选择，以及缩放导出。译图保留图像布局，并根据 OCR 结果估算对齐和字号。同字号组共用字号。复杂背景、装饰字体和低清晰度图片可能影响识别与回填效果。
 
 ## Windows 便携版
 
-1. 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/download/v0.1.0/TuYi-Windows-x64.exe)，复制到任意有权限的文件夹后运行。
+1. 下载 [Windows 64 位 EXE](https://github.com/vcstock/tuyi/releases/latest/download/TuYi-Windows-x64.exe)，复制到任意有权限的文件夹后运行。
 2. 打开「设置」，选择翻译服务，输入账号或 API Key；如有需要可配置 HTTP、HTTPS、SOCKS5 或 SOCKS5H 代理。
 3. 使用 Ctrl+V 或「选择图片」导入。需要指定译法时，填写「术语与翻译要求」后点击「开始翻译」。
 4. 选择格式和缩放后保存。JPG 默认画质为 92%，译图下方显示当前配置下的输出尺寸和文件大小。
 
-设置使用 Windows 当前用户加密保存在 `%LOCALAPPDATA%\TuYi\settings.dat`。ChatGPT 登录使用随应用打包的官方 Codex CLI。豆包、Kimi、DeepSeek 和 Gemini 的网页登录需要把提示词发送到官网，再把 AI 回复贴回应用。
+设置使用 Windows 当前用户加密保存在 `%LOCALAPPDATA%\TuYi\settings.dat`。ChatGPT 登录使用随应用打包的官方 Codex CLI。使用豆包、Kimi、DeepSeek 或 Gemini 的网页登录时，可在弹窗查看和复制完整提示词。点击「打开官网登录」，在网页发送提示词后，把 AI 回复贴回应用并点击「生成译图」。
+
+通用模型可在「设置 → 翻译服务」选择「自定义模型（兼容 API）」。填写 OpenAI 兼容的 API 地址（例如 `https://example.com/v1`）和模型 ID，服务要求鉴权时再填写 API Key。
 
 ## Docker 部署
 

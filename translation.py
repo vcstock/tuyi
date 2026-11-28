@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlsplit, urlunsplit
 
 import cv2
 import numpy as np
@@ -32,6 +33,7 @@ WEB_PROVIDERS = {
     "Gemini 网页登录": "https://gemini.google.com/",
 }
 PROVIDERS = ("DeepSeek API", "ChatGPT 登录", "OpenAI API", *tuple(API_PROVIDERS)[2:], *WEB_PROVIDERS)
+CUSTOM_API = "自定义模型（兼容 API）"
 PROTOCOLS = ("http", "https", "socks5", "socks5h")
 NETWORKS = ("系统代理", "直接连接", "手动代理")
 OCR_MODES = ("自动（优先 GPU）", "仅 CPU")
@@ -199,7 +201,24 @@ def is_session_error(message):
                                              "refresh_token_invalidated")))
 
 
-def request_translation(prompt, provider, key, mode, address, model=""):
+def custom_api_url(value):
+    try:
+        url = urlsplit(value.strip())
+        url.port
+        if (url.scheme not in ("http", "https") or not url.hostname or url.username is not None
+                or url.query or url.fragment or any(char.isspace() for char in value.strip())):
+            raise ValueError
+    except ValueError:
+        raise ValueError("请填写有效的 HTTP 或 HTTPS API 地址，例如 https://example.com/v1。") from None
+    path = url.path.rstrip("/")
+    if not path:
+        path = "/v1"
+    if not path.endswith("/chat/completions"):
+        path += "/chat/completions"
+    return urlunsplit(url._replace(path=path))
+
+
+def request_translation(prompt, provider, key, mode, address, model="", api_base=""):
     if provider == PROVIDERS[1]:
         exe = codex_path()
         env = codex_environment(mode, address)
@@ -226,26 +245,29 @@ def request_translation(prompt, provider, key, mode, address, model=""):
                 raise ValueError("ChatGPT 翻译失败。请检查 Codex 登录状态、网络和账号使用额度。")
             return output.read_text(encoding="utf-8")
 
-    if not key.strip():
+    if not key.strip() and provider != CUSTOM_API:
         raise ValueError("请输入所选服务的 API Key。")
     proxy = proxy_address(mode, address)
     deepseek = provider == PROVIDERS[0]
-    url, default_model = API_PROVIDERS[provider]
+    url, default_model = (custom_api_url(api_base), "") if provider == CUSTOM_API else API_PROVIDERS[provider]
     model = model.strip() or default_model
     if not model:
+        if provider == CUSTOM_API:
+            raise ValueError("请在设置里填写自定义模型 ID。")
         raise ValueError("请在设置里填写火山方舟的模型 ID 或推理接入点 ID。")
     data = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "response_format": {"type": "json_object"},
     }
-    if provider == "豆包 API":
+    if provider in ("豆包 API", CUSTOM_API):
         data.pop("response_format")
     if deepseek or (provider == "Kimi API" and model.startswith("kimi-k2.5")):
         data["thinking"] = {"type": "disabled"}
     with requests.Session() as session:
         session.trust_env = mode == NETWORKS[0]
-        response = session.post(url, json=data, headers={"Authorization": "Bearer " + key.strip()},
+        headers = {"Authorization": "Bearer " + key.strip()} if key.strip() else {}
+        response = session.post(url, json=data, headers=headers,
                                 proxies={"http": proxy, "https": proxy} if proxy else None,
                                 timeout=(15, 105))
         if not response.ok:
@@ -348,11 +370,12 @@ def parse_web_translation(raw, expected):
     raise ValueError(f"需要 {expected} 条译文。请复制完整回复，或每行填写一条译文。")
 
 
-def translate(lines, language, provider, key, mode, address, model="", instructions=""):
+def translate(lines, language, provider, key, mode, address, model="", instructions="", api_base=""):
     results = []
     for start in range(0, len(lines), 35):
         batch = lines[start:start + 35]
-        raw = request_translation(translation_prompt(batch, language, instructions), provider, key, mode, address, model)
+        raw = request_translation(translation_prompt(batch, language, instructions), provider, key, mode, address,
+                                  model, api_base)
         results.extend(parse_translation(raw, len(batch)))
     return results
 

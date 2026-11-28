@@ -15,11 +15,11 @@ import webbrowser
 from PIL import Image, ImageOps, ImageTk
 import requests
 
-from translation import (API_PROVIDERS, LANGUAGES, NETWORKS, OCR_MODES, PROTOCOLS, PROVIDERS, WEB_PROVIDERS,
+from translation import (API_PROVIDERS, CUSTOM_API, LANGUAGES, NETWORKS, OCR_MODES, PROTOCOLS, PROVIDERS, WEB_PROVIDERS,
                          codex_path, downloads_folder, ocr_backend, parse_web_translation, proxy_address, recognize,
                          repaint, start_login, translate, translation_prompt)
 from image_formats import EXPORT_FORMATS, IMAGE_LIMIT, IMAGE_SUFFIXES, export_image, open_image
-from windows_support import clipboard_image, load_settings, save_settings
+from windows_support import clipboard_image, copy_clipboard_text, load_settings, save_settings
 
 BG = "#ecf1f4"
 WHITE = "#ffffff"
@@ -87,8 +87,9 @@ class App:
         self.export_format = tk.StringVar(value="PNG")
         self.jpg_quality = tk.StringVar(value="92%")
         self.ocr_mode = tk.StringVar(value=OCR_MODES[0])
-        self.keys = {name: tk.StringVar() for name in API_PROVIDERS}
-        self.models = {name: tk.StringVar() for name in API_PROVIDERS}
+        self.keys = {name: tk.StringVar() for name in (*API_PROVIDERS, CUSTOM_API)}
+        self.models = {name: tk.StringVar() for name in self.keys}
+        self.api_base = tk.StringVar()
         self.protocol = tk.StringVar(value=PROTOCOLS[0])
         self.host = tk.StringVar()
         self.port = tk.StringVar()
@@ -108,8 +109,9 @@ class App:
         self.settings_error = False
         try:
             settings = load_settings()
-            if settings.get("provider") in PROVIDERS:
+            if settings.get("provider") in (*PROVIDERS, CUSTOM_API):
                 self.provider.set(settings["provider"])
+            self.api_base.set(settings.get("custom_api_base", ""))
             if settings.get("network") in NETWORKS:
                 self.network.set(settings["network"])
             if settings.get("ocr_mode") in OCR_MODES:
@@ -145,7 +147,7 @@ class App:
                                           highlightthickness=1, highlightbackground=LINE)
         config.columnconfigure(3, weight=1)
         for row, label, variable, values in [
-            (0, "翻译服务", self.provider, PROVIDERS),
+            (0, "翻译服务", self.provider, (*PROVIDERS, CUSTOM_API)),
             (2, "网络连接", self.network, NETWORKS),
         ]:
             tk.Label(config, text=label, bg=WHITE, fg=INK).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=4)
@@ -171,6 +173,10 @@ class App:
         self.model_entry.pack(side="left")
         self.model_note = tk.Label(self.model_row, bg=WHITE, fg=MUTED)
         self.model_note.pack(side="left", padx=8)
+        self.api_base_label = tk.Label(config, text="API 地址", bg=WHITE, fg=INK)
+        self.api_base_label.grid(row=4, column=2, sticky="w", padx=(16, 8), pady=4)
+        self.api_base_entry = ttk.Entry(config, textvariable=self.api_base)
+        self.api_base_entry.grid(row=4, column=3, sticky="ew", pady=4)
         self.network_note = tk.Label(config, bg=WHITE, fg=MUTED, anchor="w")
         self.network_note.grid(row=2, column=3, sticky="ew")
         self.proxy_row = tk.Frame(config, bg=WHITE)
@@ -275,7 +281,11 @@ class App:
 
     def sync_settings(self, _event=None):
         provider = self.provider.get()
-        login = provider not in API_PROVIDERS
+        login = provider not in self.keys
+        custom = provider == CUSTOM_API
+        for widget in (self.api_base_label, self.api_base_entry):
+            widget.grid() if custom else widget.grid_remove()
+        self.key_label.configure(text="API Key（可选）" if custom else "API Key")
         for widget in (self.key_entry, self.key_label, self.model_row, self.model_label):
             widget.grid_remove() if login else widget.grid()
         if login:
@@ -287,8 +297,9 @@ class App:
             self.login_row.grid_remove()
             self.key_entry.configure(textvariable=self.keys[provider])
             self.model_entry.configure(textvariable=self.models[provider])
-            default = API_PROVIDERS[provider][1]
-            self.model_note.configure(text=f"留空使用 {default}" if default else "填写模型 ID 或 ep- 开头的接入点 ID")
+            default = "" if custom else API_PROVIDERS[provider][1]
+            self.model_note.configure(text="填写模型 ID" if custom else
+                                      f"留空使用 {default}" if default else "填写模型 ID 或 ep- 开头的接入点 ID")
         manual = self.network.get() == NETWORKS[2]
         self.proxy_row.grid() if manual else self.proxy_row.grid_remove()
         if manual:
@@ -320,6 +331,7 @@ class App:
                 "ocr_mode": self.ocr_mode.get(),
                 "jpg_quality": self.jpg_quality.get(),
                 "address": address,
+                "custom_api_base": self.api_base.get().strip(),
                 "models": {name: value.get().strip() for name, value in self.models.items()},
                 "keys": {name: value.get().strip() for name, value in self.keys.items()},
             })
@@ -514,10 +526,12 @@ class App:
         provider = self.provider.get()
         if self.busy:
             self.status.set("上一张正在处理，完成后会处理当前图片。")
-        elif provider not in API_PROVIDERS or self.keys[provider].get().strip():
+        elif (provider not in self.keys or self.keys[provider].get().strip()
+              or (provider == CUSTOM_API and self.api_base.get().strip()
+                  and self.models[provider].get().strip())):
             self.start()
         else:
-            self.status.set("图片已载入。请在「设置」中填写 API Key，或选择 ChatGPT 登录。")
+            self.status.set("图片已载入。请在「设置」中填写所选翻译服务的连接信息。")
 
     def start(self):
         if self.busy or self.image is None:
@@ -550,11 +564,11 @@ class App:
         language = self.language.get()
         model = self.models[provider].get() if provider in self.models else ""
         args = (self.generation, self.image, language, provider, key, self.network.get(), address,
-                model, instructions, text_percent, self.ocr_mode.get())
+                model, instructions, text_percent, self.ocr_mode.get(), self.api_base.get())
         threading.Thread(target=self.work, args=args, daemon=True).start()
 
     def work(self, generation, image, language, provider, key, mode, address, model, instructions, text_percent,
-             ocr_mode):
+             ocr_mode, api_base):
         try:
             started = perf_counter()
             regions = recognize(image, ocr_mode)
@@ -567,7 +581,7 @@ class App:
                 return
             self.events.put((generation, "progress", f"{summary} · 正在请求 {provider} 翻译…"))
             translations = translate([text for _, text in regions], language, provider, key, mode, address,
-                                     model, instructions)
+                                     model, instructions, api_base)
             self.render(generation, image, (regions, translations, LANGUAGES[language]), text_percent)
         except requests.exceptions.Timeout:
             self.events.put((generation, "error", "连接翻译服务超时，请检查网络或代理后重试。"))
@@ -592,35 +606,43 @@ class App:
         dialog = tk.Toplevel(self.root)
         dialog.title(provider)
         dialog.transient(self.root)
-        dialog.geometry("665x435")
-        dialog.minsize(520, 335)
+        dialog.geometry("665x510")
+        dialog.minsize(570, 390)
         dialog.configure(bg=BG, padx=16, pady=12)
         dialog.columnconfigure(0, weight=1)
-        dialog.rowconfigure(2, weight=1)
+        dialog.rowconfigure(3, weight=1)
         tk.Label(dialog, text="在官网发送提示词，复制 AI 的回复，然后回到这里点击「生成译图」。",
                  bg=BG, fg=INK, wraplength=470, justify="left").grid(row=0, sticky="w", pady=(0, 8))
         panel = tk.Frame(dialog, bg=BG)
         panel.grid(row=1, sticky="ew", pady=(0, 8))
         response = tk.Text(dialog, wrap="word", height=6, width=1, padx=8, pady=6, undo=True)
-        response.grid(row=2, sticky="nsew")
+        response.grid(row=3, sticky="nsew")
         notice = tk.StringVar(value=f"需要 {len(regions)} 条译文。支持 JSON，也可每行填写一条。")
         feedback = tk.Label(dialog, textvariable=notice, bg=BG, fg=MUTED,
                             justify="left", anchor="w", wraplength=465)
-        feedback.grid(row=3, sticky="ew", pady=(7, 2))
+        feedback.grid(row=4, sticky="ew", pady=(7, 2))
         prompt = translation_prompt([text for _, text in regions], language, instructions)
+        prompt_view = tk.Text(dialog, wrap="word", height=7, width=1, padx=8, pady=6)
+        prompt_view.insert("1.0", prompt)
+        prompt_view.configure(state="disabled")
+        prompt_view.grid(row=2, sticky="ew", pady=(0, 8))
 
         def warn(message):
             feedback.configure(fg="#a32622")
             notice.set(message)
 
         def copy_prompt():
-            dialog.clipboard_clear()
-            dialog.clipboard_append(prompt)
-            if not webbrowser.open(WEB_PROVIDERS[provider]):
-                warn("提示词已复制。浏览器未打开，请手动打开官网。")
+            try:
+                copy_clipboard_text(prompt, dialog.winfo_id())
+            except OSError:
+                warn("无法写入剪贴板。请重试，或从上方提示词框手动选中并复制。")
                 return
             feedback.configure(fg=MUTED)
             notice.set("已复制提示词。请粘贴到网页聊天框。")
+
+        def open_provider():
+            if not webbrowser.open(WEB_PROVIDERS[provider]):
+                warn("浏览器未打开。请手动打开登录页。")
 
         def paste_reply():
             try:
@@ -658,10 +680,11 @@ class App:
             inputs = (regions, lines, LANGUAGES[language])
             threading.Thread(target=self.render, args=(generation, image, inputs, text_percent), daemon=True).start()
 
-        self.button(panel, "复制提示词并打开官网", copy_prompt, primary=True).pack(side="left")
+        self.button(panel, "复制提示词", copy_prompt, primary=True).pack(side="left")
+        self.button(panel, "打开官网登录", open_provider).pack(side="left", padx=(8, 0))
         self.button(panel, "粘贴网页回复", paste_reply).pack(side="left", padx=8)
         footer = tk.Frame(dialog, bg=BG)
-        footer.grid(row=4, sticky="ew", pady=(6, 0))
+        footer.grid(row=5, sticky="ew", pady=(6, 0))
         self.button(footer, "取消", cancel).pack(side="right", padx=(8, 0))
         self.button(footer, "生成译图", apply, primary=True).pack(side="right")
         dialog.bind("<Control-Return>", lambda _: apply())

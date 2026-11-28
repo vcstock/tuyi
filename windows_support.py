@@ -101,6 +101,51 @@ def image_reference(value):
     return None
 
 
+def copy_clipboard_text(text, window):
+    user = ctypes.WinDLL("user32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    user.OpenClipboard.argtypes, user.OpenClipboard.restype = (wintypes.HWND,), wintypes.BOOL
+    user.CloseClipboard.argtypes, user.CloseClipboard.restype = (), wintypes.BOOL
+    user.EmptyClipboard.argtypes, user.EmptyClipboard.restype = (), wintypes.BOOL
+    user.SetClipboardData.argtypes = (wintypes.UINT, wintypes.HANDLE)
+    user.SetClipboardData.restype = wintypes.HANDLE
+    kernel.GlobalAlloc.argtypes, kernel.GlobalAlloc.restype = (wintypes.UINT, ctypes.c_size_t), wintypes.HGLOBAL
+    kernel.GlobalLock.argtypes, kernel.GlobalLock.restype = (wintypes.HGLOBAL,), ctypes.c_void_p
+    kernel.GlobalUnlock.argtypes, kernel.GlobalUnlock.restype = (wintypes.HGLOBAL,), wintypes.BOOL
+    kernel.GlobalFree.argtypes, kernel.GlobalFree.restype = (wintypes.HGLOBAL,), wintypes.HGLOBAL
+    data = text.encode("utf-16-le") + b"\0\0"
+    handle = kernel.GlobalAlloc(2, len(data))  # GMEM_MOVEABLE
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        pointer = kernel.GlobalLock(handle)
+        if not pointer:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            ctypes.memmove(pointer, data, len(data))
+        finally:
+            kernel.GlobalUnlock(handle)
+        open_clipboard(user, window)
+        try:
+            if not user.EmptyClipboard() or not user.SetClipboardData(13, handle):  # CF_UNICODETEXT
+                raise ctypes.WinError(ctypes.get_last_error())
+            handle = None  # Windows now owns the allocation.
+        finally:
+            user.CloseClipboard()
+    finally:
+        if handle:
+            kernel.GlobalFree(handle)
+
+
+def open_clipboard(user, window=None):
+    for attempt in range(5):
+        if user.OpenClipboard(window):
+            return
+        if attempt == 4:
+            raise ctypes.WinError(ctypes.get_last_error())
+        time.sleep(.035)
+
+
 def native_clipboard():
     user = ctypes.WinDLL("user32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -115,12 +160,7 @@ def native_clipboard():
         "PNG", "image/png", "JFIF", "JPEG", "image/jpeg", "WebP", "image/webp")]
     targets.extend(((17, "dib"), (8, "dib"), (user.RegisterClipboardFormatW("HTML Format"), "html"),
                     (13, "text")))
-    for attempt in range(5):
-        if user.OpenClipboard(None):
-            break
-        if attempt == 4:
-            raise ctypes.WinError(ctypes.get_last_error())
-        time.sleep(.035)
+    open_clipboard(user)
     try:
         for identifier, kind in targets:
             handle = user.GetClipboardData(identifier)
